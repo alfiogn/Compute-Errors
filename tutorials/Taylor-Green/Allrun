@@ -1,0 +1,21 @@
+#!/bin/bash
+cd ${0%/*} || exit 1
+
+blockMesh > log.blockMesh 2>&1
+
+mkdir -p 0
+cp -r 0.orig/* 0/
+
+NPROC=$(foamDictionary -entry numberOfSubdomains -value system/decomposeParDict)
+
+if [[ $NPROC = 1 ]]
+then
+    simpleFoam -noFunctionObjects > log.simpleFoam 2>&1
+else
+    decomposePar > log.decomposePar 2>&1
+    mpirun -n $NPROC simpleFoam -noFunctionObjects -parallel > log.simpleFoam 2>&1
+    reconstructPar -latestTime > log.reconstructPar 2>&1
+    #rm -r processor*
+fi
+
+postProcess -fields '(U p)' -func errors > log.postProcess 2>&1

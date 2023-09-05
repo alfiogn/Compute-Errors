@@ -1,0 +1,1 @@
+scalar graduzx = 0;

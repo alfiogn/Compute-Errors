@@ -1,0 +1,1 @@
+scalar fz = 0;

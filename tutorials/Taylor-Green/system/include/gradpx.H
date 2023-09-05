@@ -1,0 +1,1 @@
+scalar gradpx = 1.0*M_PI*Foam::sin(4*M_PI*x);

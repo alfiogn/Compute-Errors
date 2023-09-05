@@ -1,0 +1,131 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  7
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version         2;
+    format          ascii;
+    class           dictionary;
+    location        "system";
+    object          errors;
+}
+
+libs            ( "libutilityFunctionObjects.so" );
+
+executeControl  timeStep;
+
+executeInterval 1;
+
+writeControl    timeStep;
+
+writeInterval   1;
+
+type            coded;
+
+name            writeError_u1;
+
+redirectType    writeErrors;
+
+codeOptions     #{
+    -I$(LIB_SRC)/triSurface/lnInclude \
+    -I$(COMPUTE_ERRORS_SRC)/error/lnInclude \
+    -I$(PWD)/../../analytic/include
+#};
+
+codeLibs        #{
+    -L$(FOAM_USER_LIBBIN) \
+    -lcomputeErrors
+#};
+
+codeInclude     #{
+    #include <functional>
+    #include "Errors.H"
+
+    typedef std::function<Foam::scalar(const Foam::vector&)> SFunc;
+    typedef std::function<Foam::vector(const Foam::vector&)> VFunc;
+    typedef std::function<Foam::tensor(const Foam::vector&)> TFunc;
+#};
+
+codeWrite       #{
+    // Preliminary variables
+    const fvMesh& mesh_ = mesh();
+    const volVectorField& U = mesh_.lookupObject<volVectorField>("U");
+    const volScalarField& pOrig = mesh_.lookupObject<volScalarField>("p");
+    const scalar& t = mesh_.time().value();
+    volScalarField p = pOrig;
+    dimensionedScalar pMean(p.dimensions(), 0.0);
+    forAll(pOrig, pi){ pMean.value() += pOrig[pi]*mesh_.cellVolumes()[pi]; }
+    p -= pMean/sum(mesh_.cellVolumes());
+
+    // Declare exact solutions
+    SFunc pEx = [&] (const vector& xx)
+    {
+        scalar x = xx[0];
+        scalar y = xx[1];
+        scalar z = xx[2];
+        #include "p.H"
+        return p;
+    };
+
+    VFunc UEx = [&] (const vector& xx)
+    {
+        scalar x = xx[0];
+        scalar y = xx[1];
+        scalar z = xx[2];
+        #include "ux.H"
+        #include "uy.H"
+        #include "uz.H"
+        return vector(ux, uy, uz);
+    };
+
+    TFunc gradUEx = [&] (const vector& xx)
+    {
+        const scalar& x = xx[0];
+        const scalar& y = xx[1];
+        const scalar& z = xx[2];
+        #include "graduxx.H"
+        #include "graduxy.H"
+        #include "graduxz.H"
+        #include "graduyx.H"
+        #include "graduyy.H"
+        #include "graduyz.H"
+        #include "graduzx.H"
+        #include "graduzy.H"
+        #include "graduzz.H"
+        return tensor
+            (
+                graduxx, graduxy, graduxz,
+                graduyx, graduyy, graduyz,
+                graduzx, graduzy, graduzz
+            );
+    };
+
+    // Error instances
+    vectorError errU(mesh_, U, UEx, gradUEx);
+    scalarError errp(mesh_, p, pEx);
+
+    // Write field projection
+    errU.writeProjFieldEx();
+    errp.writeProjFieldEx();
+
+    // Write errors in a CSV file
+    OFstream errorCsv("error.csv");
+    errorCsv<< "Field,NCells,Star,projL2,P0-L2" << nl
+        << "U," << mesh_.nCells() << ","
+        << errU.projDiscreteH1(false) << ","
+        << errU.projL2() << ","
+        << errU.cellP0L2() << nl
+        << "p," << mesh_.nCells() << ","
+        << errp.projDiscreteH1(false) << ","
+        << errp.projL2() << ","
+        << errp.cellP0L2() << nl;
+        //<< errT.linearH1() << ","
+        //<< errT.linearL2() << nl;
+#};
+
+
+// ************************************************************************* //

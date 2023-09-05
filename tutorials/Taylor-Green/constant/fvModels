@@ -1,0 +1,72 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  7
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      fvModels;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+forcingTerm
+{
+    type            coded;
+    name            forcingTerm;
+
+    selectionMode   all;
+    field           U;
+
+    codeOptions
+    #{
+        -I$(COMPUTE_ERRORS_SRC)/error/lnInclude \
+        -I$(LIB_SRC)/triSurface/lnInclude \
+        -I$(PWD)/../../analytic/include
+    #};
+    codeLibs
+    #{
+        -L$(FOAM_USER_LIBBIN) \
+        -lcomputeErrors
+    #};
+    codeInclude
+    #{
+        #include <functional>
+        #include "Errors.H"
+
+        typedef std::function<Foam::vector(const Foam::vector&)> VFunc;
+    #};
+    codeAddSup
+    #{
+        const scalarField& V = mesh().cellVolumes();
+        const vectorField& C = mesh().cellCentres();
+        const volVectorField& U = eqn.psi();
+        vectorField& USource = eqn.source();
+
+        VFunc F = [&] (const vector& xx)
+        {
+            const scalar& x = xx[0];
+            const scalar& y = xx[1];
+            const scalar& z = xx[2];
+            #include "fx.H"
+            #include "fy.H"
+            #include "fz.H"
+            return vector(fx, fy, fz);
+        };
+
+        vectorError errU(mesh(), U, F);
+
+        forAll(USource, ci)
+        {
+            USource[ci] -= errU.cellProj(ci, F)*V[ci];
+        }
+    #};
+}
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

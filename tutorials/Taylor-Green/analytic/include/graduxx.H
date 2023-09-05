@@ -1,0 +1,1 @@
+scalar graduxx = 2*M_PI*Foam::sin(2*M_PI*x)*Foam::sin(2*M_PI*y);

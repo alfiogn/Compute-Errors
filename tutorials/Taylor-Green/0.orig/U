@@ -1,0 +1,63 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.1.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    "(.*)"
+    {
+        type            codedMixed;
+
+        refValue        uniform (0 0 0);
+        refGradient     uniform (0 0 0);
+        valueFraction   uniform 0;
+        value           uniform (0 0 0);
+        name            mixedUpU;
+
+        codeOptions
+        #{
+            -I$(PWD)/../../analytic/include
+        #};
+
+        code
+        #{
+            const vectorField& Cf = this->patch().Cf();
+
+            forAll(Cf, i)
+            {
+                const scalar& x = Cf[i][0];
+                const scalar& y = Cf[i][1];
+                const scalar& z = Cf[i][2];
+                #include "ux.H"
+                #include "uy.H"
+                #include "uz.H"
+                this->refValue()[i] = vector(ux, uy, uz);
+                this->valueFraction()[i] = 1.0;
+            }
+        #};
+    }
+
+    "(INLET|OUTLET)"
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

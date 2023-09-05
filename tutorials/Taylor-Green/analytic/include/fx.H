@@ -1,0 +1,1 @@
+scalar fx = M_PI*(2.0*Foam::pow(1 - Foam::cos(2*M_PI*y), 2)*Foam::sin(4*M_PI*x) - 2.0*Foam::sin(4*M_PI*x) + 4.0*M_PI*Foam::sin(M_PI*(2*x - 2*y)) - 4.0*M_PI*Foam::sin(M_PI*(2*x + 2*y)) + 2.0*Foam::sin(M_PI*(4*x - 2*y)) + 2.0*Foam::sin(M_PI*(4*x + 2*y)));
