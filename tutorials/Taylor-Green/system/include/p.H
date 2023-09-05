@@ -1,1 +1,0 @@
-scalar p = -0.25*Foam::cos(4*M_PI*x) - 0.25*Foam::cos(4*M_PI*y);

@@ -1,1 +1,0 @@
-scalar graduyx = 2*M_PI*Foam::cos(2*M_PI*x)*Foam::cos(2*M_PI*y);

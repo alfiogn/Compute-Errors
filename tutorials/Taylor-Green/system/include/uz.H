@@ -1,1 +1,0 @@
-scalar uz = 0;

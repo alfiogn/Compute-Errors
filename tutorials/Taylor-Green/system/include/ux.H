@@ -1,1 +1,0 @@
-scalar ux = -Foam::sin(2*M_PI*y)*Foam::cos(2*M_PI*x);

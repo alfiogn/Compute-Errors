@@ -1,1 +1,0 @@
-scalar gradpz = 0;

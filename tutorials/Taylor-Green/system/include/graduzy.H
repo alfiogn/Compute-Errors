@@ -1,1 +1,0 @@
-scalar graduzy = 0;
