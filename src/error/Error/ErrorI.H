@@ -25,8 +25,6 @@ License
 
 #include "Error.H"
 
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
 // * * * * * * * * * * * * Protected Member Functions  * * * * * * * * * * * //
 
 template<class Type>
@@ -39,7 +37,7 @@ inline typename func::result_type Foam::Error<Type>::faceProj
 {
     const vectorField& Cf = mesh_.faceCentres();
     const vectorField& P = mesh_.points();
-    const cellList& cellFaces = mesh_.cells();
+    //const cellList& cellFaces = mesh_.cells();
     const faceList& facePoints = mesh_.faces();
 
     List<vector> verts(3, Zero);

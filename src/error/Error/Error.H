@@ -46,6 +46,7 @@ SourceFiles
 #include "triSurfaceMesh.H"
 #include "triSurfaceTools.H"
 #include "triSurfaceSearch.H"
+#include "interpolation.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -108,15 +109,21 @@ private:
         const volTypeField& F_;
 
         //- Analytic function
-        const Function& FEx_;
+        autoPtr<Function> FEx_;
 
         //- Analytic gradient
-        const GradFunction& gradFEx_;
+        autoPtr<GradFunction> gradFEx_;
 
 
 protected:
 
     // Protected demand-driven data
+
+        //- Objects relative to another case
+        mutable autoPtr<Time> time2_;
+        mutable autoPtr<fvMesh> mesh2_;
+        mutable autoPtr<volTypeField> F2_;
+        mutable autoPtr<interpolation<Type>> interpF2_;
 
         //- Nodal interpolation of field
         mutable autoPtr<pointMesh> pointMeshPtr_;
@@ -192,6 +199,21 @@ public:
         Error
         (
             const fvMesh&,
+            const GeometricField<Type, fvPatchField, volMesh>&
+        );
+
+        //- Construct from components
+        Error
+        (
+            const fvMesh&,
+            const GeometricField<Type, fvPatchField, volMesh>&,
+            const fileName&
+        );
+
+        //- Construct from components
+        Error
+        (
+            const fvMesh&,
             const GeometricField<Type, fvPatchField, volMesh>&,
             const Function&,
             const GradFunction&
@@ -203,13 +225,6 @@ public:
             const fvMesh&,
             const GeometricField<Type, fvPatchField, volMesh>&,
             const Function&
-        );
-
-        //- Construct from components
-        Error
-        (
-            const fvMesh&,
-            const GeometricField<Type, fvPatchField, volMesh>&
         );
 
         //- Copy constructor

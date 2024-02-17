@@ -27,6 +27,7 @@ License
 #include "Error.H"
 #include "fvc.H"
 #include "SortableList.H"
+
 // * * * * * * * * * * * * * Static Member Functions * * * * * * * * * * * * //
 
 template<class Type>
@@ -459,7 +460,7 @@ Foam::scalar Foam::Error<Type>::cellFacePointError
                     {
                         return magSqr
                         (
-                            gradFEx_(xx)
+                            gradFEx_()(xx)
                           - gradTetLinear(verts, values)
                         );
                     };
@@ -470,7 +471,7 @@ Foam::scalar Foam::Error<Type>::cellFacePointError
                 {
                     ScalarFunction linErr = [&] (const vector& xx)
                     {
-                        return magSqr(FEx_(xx) - tetLinear(verts, values, xx));
+                        return magSqr(FEx_()(xx) - tetLinear(verts, values, xx));
                     };
 
                     err += tetQuadrature(verts, linErr);
@@ -538,7 +539,7 @@ Foam::scalar Foam::Error<Type>::dualError
                 {
                     return magSqr
                     (
-                        gradFEx_(xx)
+                        gradFEx_()(xx)
                       - gradTriLinear(verts, values)
                     );
                 };
@@ -549,7 +550,7 @@ Foam::scalar Foam::Error<Type>::dualError
             {
                 ScalarFunction linErr = [&] (const vector& xx)
                 {
-                    return magSqr(FEx_(xx) - triLinear(verts, values, xx));
+                    return magSqr(FEx_()(xx) - triLinear(verts, values, xx));
                 };
 
                 err += triQuadrature(verts, linErr);
@@ -572,7 +573,7 @@ Foam::scalar Foam::Error<Type>::dualError
                 {
                     return magSqr
                     (
-                        gradFEx_(xx)
+                        gradFEx_()(xx)
                       - gradTetLinear(verts, values)
                     );
                 };
@@ -583,7 +584,7 @@ Foam::scalar Foam::Error<Type>::dualError
             {
                 ScalarFunction linErr = [&] (const vector& xx)
                 {
-                    return magSqr(FEx_(xx) - tetLinear(verts, values, xx));
+                    return magSqr(FEx_()(xx) - tetLinear(verts, values, xx));
                 };
 
                 err += tetQuadrature(verts, linErr);
@@ -603,6 +604,109 @@ template<class Type>
 Foam::Error<Type>::Error
 (
     const fvMesh& mesh,
+    const GeometricField<Type, fvPatchField, volMesh>& F
+)
+:
+    mesh_(mesh),
+    F_(F),
+    FEx_(new Function(Zero_)),
+    gradFEx_(new GradFunction(GZero_)),
+    time2_(nullptr),
+    mesh2_(nullptr),
+    F2_(nullptr),
+    interpF2_(nullptr),
+    pointMeshPtr_(nullptr),
+    volPointInterpPtr_(nullptr),
+    faceFPtr_(nullptr),
+    pointFPtr_(nullptr),
+    h_(-1.0)
+{}
+
+
+template<class Type>
+Foam::Error<Type>::Error
+(
+    const fvMesh& mesh,
+    const GeometricField<Type, fvPatchField, volMesh>& F,
+    const fileName& path
+)
+:
+    mesh_(mesh),
+    F_(F),
+    FEx_(nullptr),
+    gradFEx_(nullptr),
+    time2_(nullptr),
+    mesh2_(nullptr),
+    F2_(nullptr),
+    interpF2_(nullptr),
+    pointMeshPtr_(nullptr),
+    volPointInterpPtr_(nullptr),
+    faceFPtr_(nullptr),
+    pointFPtr_(nullptr),
+    h_(-1.0)
+{
+    time2_.set
+    (
+        new Time
+        (
+            Time::controlDictName,
+            fileName(path).toAbsolute(),
+            path
+        )
+    );
+
+    mesh2_.set
+    (
+        new fvMesh
+        (
+            IOobject
+            (
+                fvMesh::defaultRegion,
+                time2_().times().last().name(),
+                time2_(),
+                Foam::IOobject::MUST_READ
+            )
+        )
+    );
+
+    F2_.set
+    (
+        new volTypeField
+        (
+            IOobject
+            (
+                F_.name(),
+                time2_().times().last().name(),
+                mesh2_(),
+                Foam::IOobject::MUST_READ
+            ),
+            mesh2_()
+        )
+    );
+
+    interpF2_ = interpolation<Type>::New("cellPointFace", F2_);
+
+    FEx_.reset
+    (
+        new Function
+        (
+            [&] (const vector& xx)
+            {
+                const label celli = mesh2_().findCell(xx);
+                return interpF2_().interpolate(xx, celli);
+            }
+        )
+    );
+
+    // TODO: gradient
+    gradFEx_.reset(new GradFunction(GZero_));
+}
+
+
+template<class Type>
+Foam::Error<Type>::Error
+(
+    const fvMesh& mesh,
     const GeometricField<Type, fvPatchField, volMesh>& F,
     const typename Foam::Error<Type>::Function& FEx,
     const typename Foam::Error<Type>::GradFunction& gradFEx
@@ -610,8 +714,8 @@ Foam::Error<Type>::Error
 :
     mesh_(mesh),
     F_(F),
-    FEx_(FEx),
-    gradFEx_(gradFEx),
+    FEx_(new Function(FEx)),
+    gradFEx_(new GradFunction(gradFEx)),
     pointMeshPtr_(nullptr),
     volPointInterpPtr_(nullptr),
     faceFPtr_(nullptr),
@@ -630,27 +734,8 @@ Foam::Error<Type>::Error
 :
     mesh_(mesh),
     F_(F),
-    FEx_(FEx),
-    gradFEx_(GZero_),
-    pointMeshPtr_(nullptr),
-    volPointInterpPtr_(nullptr),
-    faceFPtr_(nullptr),
-    pointFPtr_(nullptr),
-    h_(-1.0)
-{}
-
-
-template<class Type>
-Foam::Error<Type>::Error
-(
-    const fvMesh& mesh,
-    const GeometricField<Type, fvPatchField, volMesh>& F
-)
-:
-    mesh_(mesh),
-    F_(F),
-    FEx_(Zero_),
-    gradFEx_(GZero_),
+    FEx_(new Function(FEx)),
+    gradFEx_(new GradFunction(GZero_)),
     pointMeshPtr_(nullptr),
     volPointInterpPtr_(nullptr),
     faceFPtr_(nullptr),
@@ -986,7 +1071,7 @@ void Foam::Error<Type>::writeProjFieldEx() const
 
     forAll(projFEx, ci)
     {
-        projFEx[ci] = cellProj(ci, FEx_);
+        projFEx[ci] = cellProj(ci, FEx_());
     }
 
     projFEx.rename(F_.name() + "Ex");
@@ -1012,7 +1097,7 @@ void Foam::Error<Type>::writeProjGradEx() const
 
     forAll(projGradFEx, ci)
     {
-        projGradFEx[ci] = cellProj(ci, gradFEx_);
+        projGradFEx[ci] = cellProj(ci, gradFEx_());
     }
 
     projGradFEx.write();
@@ -1036,7 +1121,7 @@ void Foam::Error<Type>::writePointFieldEx() const
 
     forAll(P, pi)
     {
-        pointFEx[pi] = FEx_(P[pi]);
+        pointFEx[pi] = FEx_()(P[pi]);
     }
 
     pointFEx.write();
@@ -1116,7 +1201,7 @@ void Foam::Error<Type>::writePointGradEx() const
 
     forAll(P, pi)
     {
-        pointGradFEx[pi] = gradFEx_(P[pi]);
+        pointGradFEx[pi] = gradFEx_()(P[pi]);
     }
 
     pointGradFEx.write();
@@ -1161,7 +1246,7 @@ Foam::scalar Foam::Error<Type>::cellP0L2() const
 
                 ScalarFunction linErr = [&] (const vector& xx)
                 {
-                    return magSqr(FEx_(xx) - F_[ci]);
+                    return magSqr(FEx_()(xx) - F_[ci]);
                 };
 
                 err += tetQuadrature(verts, linErr);
@@ -1185,7 +1270,7 @@ Foam::scalar Foam::Error<Type>::projL2() const
         err +=
             mask()[ci]*(1.0 - cutMask()[ci])
            *mesh_.cellVolumes()[ci]
-           *magSqr(F_[ci] - cellProj(ci, FEx_));
+           *magSqr(F_[ci] - cellProj(ci, FEx_()));
     }
 
     reduce(err, sumOp<scalar>());
@@ -1207,7 +1292,7 @@ Foam::scalar Foam::Error<Type>::projH1() const
         err +=
             mask()[ci]*(1.0 - cutMask()[ci])
            *mesh_.cellVolumes()[ci]
-           *magSqr(gradF[ci] - cellProj(ci, gradFEx_));
+           *magSqr(gradF[ci] - cellProj(ci, gradFEx_()));
     }
 
     reduce(err, sumOp<scalar>());
@@ -1226,7 +1311,7 @@ Foam::scalar Foam::Error<Type>::projDiscreteH1
 
     forAll(projFEx, ci)
     {
-        projFEx[ci] = cellProj(ci, FEx_);
+        projFEx[ci] = cellProj(ci, FEx_());
     }
 
     const surfaceScalarField& magSf = mesh_.magSf();
@@ -1237,7 +1322,7 @@ Foam::scalar Foam::Error<Type>::projDiscreteH1
 
     //tmp<surfaceTypeField> tsnF = fvc::snGrad(F_);
     //const surfaceTypeField& snF = tsnF();
-    //tmp<surfaceTypeField> tsnFEx = fvc::snGrad(projFEx_);
+    //tmp<surfaceTypeField> tsnFEx = fvc::snGrad(projFEx_());
     //const surfaceTypeField& snFEx = tsnFEx();
 
     scalar err = 0.0;
@@ -1329,7 +1414,7 @@ Foam::scalar Foam::Error<Type>::dualStar() const
             return magSqr
             (
                 (F_[own[i]] - F_[nei[i]])*deltas[i]
-              + (gradFEx_(xx) & Sf[i]/magSf[i])
+              + (gradFEx_()(xx) & Sf[i]/magSf[i])
             );
         };
 
