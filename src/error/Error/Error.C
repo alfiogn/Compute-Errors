@@ -613,8 +613,11 @@ Foam::Error<Type>::Error
     gradFEx_(new GradFunction(GZero_)),
     time2_(nullptr),
     mesh2_(nullptr),
+    mesh2Search_(nullptr),
     F2_(nullptr),
     interpF2_(nullptr),
+    GradF2_(nullptr),
+    interpGradF2_(nullptr),
     pointMeshPtr_(nullptr),
     volPointInterpPtr_(nullptr),
     faceFPtr_(nullptr),
@@ -637,8 +640,11 @@ Foam::Error<Type>::Error
     gradFEx_(nullptr),
     time2_(nullptr),
     mesh2_(nullptr),
+    mesh2Search_(nullptr),
     F2_(nullptr),
     interpF2_(nullptr),
+    GradF2_(nullptr),
+    interpGradF2_(nullptr),
     pointMeshPtr_(nullptr),
     volPointInterpPtr_(nullptr),
     faceFPtr_(nullptr),
@@ -669,6 +675,11 @@ Foam::Error<Type>::Error
         )
     );
 
+    mesh2Search_.set
+    (
+        new meshSearch(mesh2_())
+    );
+
     F2_.set
     (
         new volTypeField
@@ -686,20 +697,41 @@ Foam::Error<Type>::Error
 
     interpF2_ = interpolation<Type>::New("cellPointFace", F2_);
 
+    GradF2_.set
+    (
+        new volGradTypeField(fvc::grad(F2_()))
+    );
+
+    interpGradF2_ = interpolation<GradType>::New("cellPointFace", GradF2_);
+
     FEx_.reset
     (
         new Function
         (
             [&] (const vector& xx)
             {
-                const label celli = mesh2_().findCell(xx);
+                const label celli =
+                    mesh2Search_().findCell(xx, startCell_);
+                startCell_ = celli;
                 return interpF2_().interpolate(xx, celli);
             }
         )
     );
 
     // TODO: gradient
-    gradFEx_.reset(new GradFunction(GZero_));
+    gradFEx_.reset
+    (
+        new GradFunction
+        (
+            [&] (const vector& xx)
+            {
+                const label celli =
+                    mesh2Search_().findCell(xx, startCell_);
+                startCell_ = celli;
+                return interpGradF2_().interpolate(xx, celli);
+            }
+        )
+    );
 }
 
 

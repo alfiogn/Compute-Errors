@@ -37,6 +37,7 @@ SourceFiles
 
 #include <functional>
 #include "fvMesh.H"
+#include "meshSearch.H"
 #include "List.H"
 #include "fvcGrad.H"
 #include "volFields.H"
@@ -74,15 +75,15 @@ public:
         typedef GeometricField<Type, fvPatchField, volMesh> volTypeField;
 
         typedef GeometricField<Type, fvsPatchField, surfaceMesh>
-        surfaceTypeField;
+            surfaceTypeField;
 
         typedef GeometricField<Type, pointPatchField, pointMesh> pointTypeField;
 
         typedef GeometricField<GradType, fvPatchField, volMesh>
-        volGradTypeField;
+            volGradTypeField;
 
         typedef GeometricField<GradType, pointPatchField, pointMesh>
-        pointGradTypeField;
+            pointGradTypeField;
 
         typedef std::function<scalar(const vector&)> ScalarFunction;
 
@@ -122,8 +123,13 @@ protected:
         //- Objects relative to another case
         mutable autoPtr<Time> time2_;
         mutable autoPtr<fvMesh> mesh2_;
+        mutable autoPtr<meshSearch> mesh2Search_;
         mutable autoPtr<volTypeField> F2_;
         mutable autoPtr<interpolation<Type>> interpF2_;
+        mutable autoPtr<volGradTypeField> GradF2_;
+        mutable autoPtr<interpolation<GradType>> interpGradF2_;
+        mutable label startCell_ = 0;
+
 
         //- Nodal interpolation of field
         mutable autoPtr<pointMesh> pointMeshPtr_;
